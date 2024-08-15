@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEditor.VersionControl;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Profiling;
 public partial class CameraRender
 {
     ScriptableRenderContext context;
@@ -25,7 +26,9 @@ public partial class CameraRender
     {
         this.context = context;
         this.camera = camera;
-
+        PrepareBuffer();
+        //为什么要写在Cull之前。放在后面就会看不到，被剔除掉了吗？这里的剔除逻辑是什么？
+        PrepareForSceneWindow();
         if (!Cull())
         {
             return;
@@ -34,6 +37,7 @@ public partial class CameraRender
         Setup();
         DrawVisibleGeometry();
         DrawUnsupportedShaders();
+        DrawGizmos();
         Submit();
     }
 
@@ -54,7 +58,7 @@ public partial class CameraRender
     }
     void Submit()
     {
-        buffer.EndSample(bufferName);
+        buffer.EndSample(SampleName);
         ExecuteBuffer();
         context.Submit();
     }
@@ -63,7 +67,7 @@ public partial class CameraRender
     {
         context.SetupCameraProperties(camera);
         buffer.ClearRenderTarget(true, true, Color.clear);
-        buffer.BeginSample(bufferName);
+        buffer.BeginSample(SampleName);
         ExecuteBuffer();
     }
 
