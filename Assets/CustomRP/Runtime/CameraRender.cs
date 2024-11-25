@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using UnityEditor.VersionControl;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Profiling;
@@ -8,26 +7,29 @@ public partial class CameraRender
 {
     ScriptableRenderContext context;
     CullingResults cullingResults;
-    //Õâ¸öºÍAlwaysÊÇ²»Ò»ÑùµÄ£¬ËüÃÇÓĞÊ²Ã´²î±ğÄØ£¿
-    static ShaderTagId unlitShaderTagId = new ShaderTagId("SRPDefaultUnlit");
+
+    private static ShaderTagId
+        unlitShaderTagId = new ShaderTagId("SRPDefaultUnlit"),
+        litShaderTagId = new ShaderTagId("CustomLit");
 
     static Material errorMaterial;
     Camera camera;
 
     const string bufferName = "Render Camera";
 
-    //CommandBufferÃ»ÓĞ´østring²ÎÊıµÄ¹¹Ôìº¯Êı£¬Òò´ËÏÂÃæµÄĞ´·¨¿ÉÒÔÖ»ÓĞÒ»¸öÓï¾ä¾ÍÍê³ÉnameµÄ¸³Öµ£¬¾ÍÏñÊÇ¸øCommandBufferµÄ¿Õ²Î¹¹Ôìº¯Êı¼ÓÁËname=bufferNameÓï¾äÒ»Ñù
+    //CommandBufferæ²¡æœ‰å¸¦stringå‚æ•°çš„æ„é€ å‡½æ•°ï¼Œå› æ­¤ä¸‹é¢çš„å†™æ³•å¯ä»¥åªæœ‰ä¸€ä¸ªè¯­å¥å°±å®Œæˆnameçš„èµ‹å€¼ï¼Œå°±åƒæ˜¯ç»™CommandBufferçš„ç©ºå‚æ„é€ å‡½æ•°åŠ äº†name=bufferNameè¯­å¥ä¸€æ ·
     CommandBuffer buffer = new CommandBuffer
     {
         name = bufferName
     };
-
-    public void Render(ScriptableRenderContext context, Camera camera)
+    Lighting lighting = new Lighting();
+    public void Render(ScriptableRenderContext context, Camera camera,
+        bool useDynamicBatching, bool useGPUInstancing)
     {
         this.context = context;
         this.camera = camera;
         PrepareBuffer();
-        //ÎªÊ²Ã´ÒªĞ´ÔÚCullÖ®Ç°¡£·ÅÔÚºóÃæ¾Í»á¿´²»µ½£¬±»ÌŞ³ıµôÁËÂğ£¿ÕâÀïµÄÌŞ³ıÂß¼­ÊÇÊ²Ã´£¿
+        //ä¸ºä»€ä¹ˆè¦å†™åœ¨Cullä¹‹å‰ã€‚æ”¾åœ¨åé¢å°±ä¼šçœ‹ä¸åˆ°ï¼Œè¢«å‰”é™¤æ‰äº†å—ï¼Ÿè¿™é‡Œçš„å‰”é™¤é€»è¾‘æ˜¯ä»€ä¹ˆï¼Ÿ
         PrepareForSceneWindow();
         if (!Cull())
         {
@@ -35,19 +37,25 @@ public partial class CameraRender
         }
 
         Setup();
-        DrawVisibleGeometry();
+        lighting.Setup(context, cullingResults);
+        DrawVisibleGeometry(useDynamicBatching,useGPUInstancing);
         DrawUnsupportedShaders();
         DrawGizmos();
         Submit();
     }
 
-    void DrawVisibleGeometry()
+    void DrawVisibleGeometry(bool useDynamicBatching,bool useGPUInstancing)
     {
         var sorttingSettings = new SortingSettings(camera)
         {
             criteria = SortingCriteria.CommonOpaque
         };
-        var drawingSetting = new DrawingSettings(unlitShaderTagId,sorttingSettings);
+        var drawingSetting = new DrawingSettings(unlitShaderTagId, sorttingSettings)
+        {
+            enableDynamicBatching = useDynamicBatching,
+            enableInstancing = useGPUInstancing
+        };
+        drawingSetting.SetShaderPassName(1,litShaderTagId);
         var filteringSettings = new FilteringSettings(RenderQueueRange.opaque);
         context.DrawRenderers(cullingResults, ref drawingSetting, ref filteringSettings);
         context.DrawSkybox(camera);
