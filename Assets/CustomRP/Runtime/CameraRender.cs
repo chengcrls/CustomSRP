@@ -24,23 +24,25 @@ public partial class CameraRender
     };
     Lighting lighting = new Lighting();
     public void Render(ScriptableRenderContext context, Camera camera,
-        bool useDynamicBatching, bool useGPUInstancing)
+        bool useDynamicBatching, bool useGPUInstancing,
+        ShadowSetting shadowSetting)
     {
         this.context = context;
         this.camera = camera;
         PrepareBuffer();
         //为什么要写在Cull之前。放在后面就会看不到，被剔除掉了吗？这里的剔除逻辑是什么？
         PrepareForSceneWindow();
-        if (!Cull())
+        if (!Cull(shadowSetting.maxDistance))
         {
             return;
         }
 
         Setup();
-        lighting.Setup(context, cullingResults);
+        lighting.Setup(context, cullingResults, shadowSetting);
         DrawVisibleGeometry(useDynamicBatching,useGPUInstancing);
         DrawUnsupportedShaders();
         DrawGizmos();
+        lighting.Cleanup();
         Submit();
     }
 
@@ -86,10 +88,11 @@ public partial class CameraRender
         buffer.Clear();
     }
 
-    bool Cull()
+    bool Cull(float maxShadowDistance)
     {
         if (camera.TryGetCullingParameters(out ScriptableCullingParameters p))
         {
+            p.shadowDistance = Mathf.Min(maxShadowDistance,camera.farClipPlane);
             cullingResults=context.Cull(ref p);
             return true;
         }
